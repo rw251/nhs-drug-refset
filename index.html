@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/web/apple-touch-icon.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/web/favicon-32x32.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="/web/favicon-16x16.png"
+    />
+    <link rel="manifest" href="/web/site.webmanifest" />
+    <link rel="mask-icon" href="/web/safari-pinned-tab.svg" color="#5bbad5" />
+    <link rel="shortcut icon" href="/web/favicon.ico" />
+    <meta name="theme-color" content="#ffffff" />
+
+    <title>Drug ref sets</title>
+
+    <link rel="stylesheet" href="/web/style.css" />
+  </head>
+  <body>
+    <div
+      id="version-wrapper"
+      style="text-align: center; font-size: 18px; margin: 10px"
+    >
+      <select id="version">
+        <option disabled selected>Please select SNOMED version</option>
+      </select>
+    </div>
+    <div class="wrapper" style="display: none">
+      <div id="ref-set-wrapper" style="text-align: center">
+        <input
+          type="text"
+          id="inp"
+          oninput="filter_list()"
+          placeholder="Search for the ref set..."
+          class="form-control"
+        />
+
+        <div class="list scrollable scrollable-refs">
+          <ul class="list-group"></ul>
+        </div>
+      </div>
+
+      <div id="ref-set-codes" style="display: none">
+        <div class="header">
+          <h3></h3>
+          <div
+            style="
+              display: flex;
+              flex-direction: row;
+              justify-content: space-between;
+              align-items: center;
+            "
+          >
+            <span id="message"></span>
+            <button>Copy</button>
+          </div>
+        </div>
+        <div class="scrollable scrollable-defs">
+          <table>
+            <thead>
+              <tr>
+                <td>Code</td>
+                <td>Description</td>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script src="/web/script.js" defer></script>
+  </body>
+</html>
