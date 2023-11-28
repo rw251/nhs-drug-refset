@@ -94,8 +94,8 @@ async function loadDefinitions(folder) {
 
 async function loadRefSets(folder) {
   console.log('loading refs...');
-  refSets = await fetch(`/files/processed/${folder}/refSets.json`).then((x) =>
-    x.json()
+  refSets = await fetch(`/files/processed/${folder}/refSets-0-9999.json`).then(
+    (x) => x.json()
   );
   refSetNames = Object.keys(refSets);
   const refSetHTML = refSetNames

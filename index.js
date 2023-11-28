@@ -12,7 +12,6 @@ import fs, {
   mkdirSync,
   readFileSync,
   readdirSync,
-  write,
   writeFileSync,
 } from 'fs';
 import { Readable } from 'stream';
@@ -21,6 +20,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import 'dotenv/config';
 import decompress from 'decompress';
+import { compress } from 'brotli';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -128,16 +128,38 @@ async function extractZip(zipFile) {
   return name;
 }
 
-function loadDataIntoMemory(dir) {
+function getFileNames(dir) {
   const rawFilesDir = join(RAW_DIR, dir);
   const processedFilesDir = join(PROCESSED_DIR, dir);
   const definitionFile = join(processedFilesDir, 'defs.json');
-  const refSetFile = join(processedFilesDir, 'refSets.json');
-  if (existsSync(definitionFile) && existsSync(refSetFile)) {
-    console.log(`> The json files already exist so I'll just load them...`);
-    const definitions = JSON.parse(readFileSync(definitionFile));
-    const refSets = JSON.parse(readFileSync(definitionFile));
-    return { definitions, refSets };
+  const refSetFile1 = join(processedFilesDir, 'refSets-0-9999.json');
+  const refSetFile2 = join(processedFilesDir, 'refSets-10000+.json');
+  const definitionFileBrotli = join(processedFilesDir, 'defs.json.br');
+  const refSetFile1Brotli = join(processedFilesDir, 'refSets-0-9999.json.br');
+  const refSetFile2Brotli = join(processedFilesDir, 'refSets-10000+.json.br');
+  return {
+    rawFilesDir,
+    definitionFile,
+    refSetFile1,
+    refSetFile2,
+    definitionFileBrotli,
+    refSetFile1Brotli,
+    refSetFile2Brotli,
+  };
+}
+
+function loadDataIntoMemory(dir) {
+  const { rawFilesDir, definitionFile, refSetFile1, refSetFile2 } =
+    getFileNames(dir);
+  if (
+    existsSync(definitionFile) &&
+    existsSync(refSetFile1) &&
+    existsSync(refSetFile2)
+  ) {
+    console.log(`> The json files already exist so I'll move on...`);
+    // const definitions = JSON.parse(readFileSync(definitionFile));
+    // const refSets = JSON.parse(readFileSync(definitionFile));
+    return dir;
   }
   if (!existsSync(processedFilesDir)) {
     mkdirSync(processedFilesDir);
@@ -152,6 +174,7 @@ function loadDataIntoMemory(dir) {
     readdirSync(REFSET_DIR).filter((x) => x.indexOf('Simple') > -1)[0]
   );
   const refSets = {};
+  const allConcepts = {};
   readFileSync(refsetFile, 'utf8')
     .split('\n')
     .forEach((row) => {
@@ -163,8 +186,11 @@ function loadDataIntoMemory(dir) {
         refsetId,
         referencedComponentId,
       ] = row.replace(/\r/g, '').split('\t');
-      if (!refSets[refsetId])
+      if (!refSets[refsetId]) {
+        allConcepts[refsetId] = true;
         refSets[refsetId] = { activeConcepts: [], inactiveConcepts: [] };
+      }
+      allConcepts[referencedComponentId] = true;
       if (active === '1') {
         refSets[refsetId].activeConcepts.push(referencedComponentId);
       } else {
@@ -219,6 +245,7 @@ function loadDataIntoMemory(dir) {
   );
   const simpleDefs = {};
   Object.entries(definitions).forEach(([conceptId, defs]) => {
+    if (!allConcepts[conceptId]) return;
     defs.sort((a, b) => {
       if (a.active && !b.active) return -1;
       if (b.active && !a.active) return 1;
@@ -229,12 +256,19 @@ function loadDataIntoMemory(dir) {
     simpleDefs[conceptId] = defs[0];
   });
 
-  const simpleRefSets = {};
+  const simpleRefSetsLT10000 = {};
+  const simpleRefSets10000PLUS = {};
 
   Object.keys(refSets).forEach((refSetId) => {
     if (!simpleDefs[refSetId])
       console.log(`No description for refset with id: ${refSetId}`);
     else {
+      let simpleRefSets =
+        refSets[refSetId].activeConcepts.length +
+          refSets[refSetId].inactiveConcepts.length <
+        10000
+          ? simpleRefSetsLT10000
+          : simpleRefSets10000PLUS;
       const def = simpleDefs[refSetId].term;
       if (simpleRefSets[def])
         console.log(`There is already an entry for: ${def}`);
@@ -245,9 +279,48 @@ function loadDataIntoMemory(dir) {
   });
 
   writeFileSync(definitionFile, JSON.stringify(simpleDefs, null, 2));
-  writeFileSync(refSetFile, JSON.stringify(simpleRefSets, null, 2));
+  writeFileSync(refSetFile1, JSON.stringify(simpleRefSetsLT10000, null, 2));
+  writeFileSync(refSetFile2, JSON.stringify(simpleRefSets10000PLUS, null, 2));
 
-  return { definitions: simpleDefs, refSets };
+  return dir;
+}
+
+function brot(file, fileBrotli) {
+  console.log(`> Compressing ${file}...`);
+  const result = compress(readFileSync(file), {
+    extension: 'br',
+    quality: 11, //compression level - 11 is max
+  });
+  console.log(`> Compressed. Writing to ${fileBrotli}...`);
+  fs.writeFileSync(fileBrotli, result);
+}
+
+function compressJson(dir) {
+  const {
+    definitionFile,
+    refSetFile1,
+    refSetFile2,
+    definitionFileBrotli,
+    refSetFile1Brotli,
+    refSetFile2Brotli,
+  } = getFileNames(dir);
+  if (
+    existsSync(definitionFileBrotli) &&
+    existsSync(refSetFile1Brotli) &&
+    existsSync(refSetFile2Brotli)
+  ) {
+    console.log(`> The brotli files already exist so I'll move on...`);
+    // const definitions = JSON.parse(readFileSync(definitionFile));
+    // const refSets = JSON.parse(readFileSync(definitionFile));
+    return dir;
+  }
+
+  console.log('> Starting compression. TAKES A WHILE - GO GET A CUP OF TEA!');
+
+  brot(refSetFile1, refSetFile1Brotli);
+  brot(refSetFile2, refSetFile2Brotli);
+  brot(definitionFile, definitionFileBrotli);
+  console.log(`> All compressed.`);
 }
 
 function rest() {
@@ -263,4 +336,5 @@ getLatestUrl()
   .then(downloadIfNotExists)
   .then(extractZip)
   .then(loadDataIntoMemory)
+  .then(compressJson)
   .then(rest);

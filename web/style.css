@@ -118,8 +118,25 @@ td, th {
 }
 
 .scrollable {
-  overflow-y: auto
+  overflow-y: auto;
+  /* Firefox understands this*/
+  /* scrollbar-color: #666666 #dddddd;
+  scrollbar-width: thin; */
 }
+
+/* other browsers understand this */
+/* ::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track-piece {
+  background-color: #dddddd;
+}
+
+::-webkit-scrollbar-thumb:vertical {
+  height: 20px;
+  background-color: #666666;
+} */
 
 h3 {
   margin-top: 0;

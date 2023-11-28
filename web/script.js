@@ -66,7 +66,7 @@ async function setupRoutes() {
 $versionPicker.addEventListener('change', async (event) => {
   const folder = event.target.value;
   worker.postMessage({ action: 'load', params: { folder } });
-  $versionWrapper.innerHTML = `<div>Loading the data for ${folder}</div>${loader}`;
+  $versionWrapper.innerHTML = `<div style="padding-top:10px">Loading the data for ${folder}</div>${loader}`;
 });
 
 setupRoutes();
