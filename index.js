@@ -16,20 +16,20 @@ import fs, {
 } from 'fs';
 import { Readable } from 'stream';
 import { finished } from 'stream/promises';
-import { join, dirname } from 'path';
+import path from 'path';
 import { fileURLToPath } from 'url';
 import 'dotenv/config';
 import decompress from 'decompress';
 import { compress } from 'brotli';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let Cookie;
 
-const FILES_DIR = join(__dirname, 'files');
-const ZIP_DIR = join(FILES_DIR, 'zip');
-const RAW_DIR = join(FILES_DIR, 'raw');
-const PROCESSED_DIR = join(FILES_DIR, 'processed');
+const FILES_DIR = path.join(__dirname, 'files');
+const ZIP_DIR = path.join(FILES_DIR, 'zip');
+const RAW_DIR = path.join(FILES_DIR, 'raw');
+const PROCESSED_DIR = path.join(FILES_DIR, 'processed');
 
 const existingFiles = fs.readdirSync(ZIP_DIR);
 
@@ -95,7 +95,7 @@ async function downloadIfNotExists(url) {
   }
 
   console.log(`> That zip is not stored locally. Downloading...`);
-  const outputFile = join(ZIP_DIR, filename);
+  const outputFile = path.join(ZIP_DIR, filename);
   const stream = fs.createWriteStream(outputFile);
   const { body } = await fetch(url, { headers: { Cookie } });
   await finished(Readable.fromWeb(body).pipe(stream));
@@ -105,8 +105,8 @@ async function downloadIfNotExists(url) {
 
 async function extractZip(zipFile) {
   const name = zipFile.replace('.zip', '');
-  const file = join(ZIP_DIR, zipFile);
-  const outDir = join(RAW_DIR, name);
+  const file = path.join(ZIP_DIR, zipFile);
+  const outDir = path.join(RAW_DIR, name);
   if (existsSync(outDir)) {
     console.log(
       `> The directory ${outDir} already exists, so I'm not unzipping.`
@@ -128,15 +128,27 @@ async function extractZip(zipFile) {
   return name;
 }
 
-function getFileNames(dir) {
-  const rawFilesDir = join(RAW_DIR, dir);
-  const processedFilesDir = join(PROCESSED_DIR, dir);
-  const definitionFile = join(processedFilesDir, 'defs.json');
-  const refSetFile1 = join(processedFilesDir, 'refSets-0-9999.json');
-  const refSetFile2 = join(processedFilesDir, 'refSets-10000+.json');
-  const definitionFileBrotli = join(processedFilesDir, 'defs.json.br');
-  const refSetFile1Brotli = join(processedFilesDir, 'refSets-0-9999.json.br');
-  const refSetFile2Brotli = join(processedFilesDir, 'refSets-10000+.json.br');
+function getFileNames(dir, startingFromProjectDir) {
+  const rawFilesDir = path.join(RAW_DIR, dir);
+  const processedFilesDirFromRoot = path.join(PROCESSED_DIR, dir);
+  const processedFilesDir = startingFromProjectDir
+    ? path.join('files', 'processed', dir)
+    : processedFilesDirFromRoot;
+  const definitionFile = path.join(processedFilesDir, 'defs.json');
+  const refSetFile1 = path.join(processedFilesDir, 'refSets-0-9999.json');
+  const refSetFile2 = path.join(processedFilesDir, 'refSets-10000+.json');
+  const definitionFileBrotli = path.join(
+    processedFilesDirFromRoot,
+    'defs.json.br'
+  );
+  const refSetFile1Brotli = path.join(
+    processedFilesDirFromRoot,
+    'refSets-0-9999.json.br'
+  );
+  const refSetFile2Brotli = path.join(
+    processedFilesDirFromRoot,
+    'refSets-10000+.json.br'
+  );
   return {
     rawFilesDir,
     definitionFile,
@@ -164,12 +176,12 @@ function loadDataIntoMemory(dir) {
   if (!existsSync(processedFilesDir)) {
     mkdirSync(processedFilesDir);
   }
-  const DRUG_DIR = join(
+  const DRUG_DIR = path.join(
     rawFilesDir,
     readdirSync(rawFilesDir).filter((x) => x.indexOf('Drug') > -1)[0]
   );
-  const REFSET_DIR = join(DRUG_DIR, 'Full', 'Refset', 'Content');
-  const refsetFile = join(
+  const REFSET_DIR = path.join(DRUG_DIR, 'Full', 'Refset', 'Content');
+  const refsetFile = path.join(
     REFSET_DIR,
     readdirSync(REFSET_DIR).filter((x) => x.indexOf('Simple') > -1)[0]
   );
@@ -203,8 +215,8 @@ function loadDataIntoMemory(dir) {
 
   const definitions = {};
 
-  const TERM_DIR = join(DRUG_DIR, 'Full', 'Terminology');
-  const descFile = join(
+  const TERM_DIR = path.join(DRUG_DIR, 'Full', 'Terminology');
+  const descFile = path.join(
     TERM_DIR,
     readdirSync(TERM_DIR).filter((x) => x.indexOf('_Description_') > -1)[0]
   );
@@ -321,14 +333,81 @@ function compressJson(dir) {
   brot(refSetFile2, refSetFile2Brotli);
   brot(definitionFile, definitionFileBrotli);
   console.log(`> All compressed.`);
+  return dir;
 }
 
 function rest() {
   const versions = readdirSync(PROCESSED_DIR).filter((x) => x !== '.gitignore');
   writeFileSync(
-    join(__dirname, 'routes.json'),
+    path.join(__dirname, 'routes.json'),
     JSON.stringify(versions, null, 2)
   );
+}
+
+import {
+  S3Client,
+  HeadObjectCommand,
+  PutObjectCommand,
+} from '@aws-sdk/client-s3';
+
+let s3;
+async function uploadToS3(file, brotliFile) {
+  const posixFilePath = file.split(path.sep).join(path.posix.sep);
+  const params = {
+    Bucket: 'nhs-drug-refset',
+    Key: posixFilePath,
+  };
+
+  const exists = await s3
+    .send(new HeadObjectCommand(params))
+    .then((x) => {
+      console.log(`> ${file} already exists in R2 so skipping...`);
+      return true;
+    })
+    .catch((err) => {
+      if (err.name === 'NotFound') return false;
+    });
+
+  if (!exists) {
+    console.log(`> ${file} does not exist in R2. Uploading...`);
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: 'nhs-drug-refset',
+        Key: posixFilePath,
+        Body: readFileSync(brotliFile),
+        ContentEncoding: 'br',
+        ContentType: 'application/json',
+      })
+    );
+    console.log('> Uploaded.');
+  }
+}
+
+async function uploadToR2(dir) {
+  const accessKeyId = `${process.env.ACCESS_KEY_ID}`;
+  const secretAccessKey = `${process.env.SECRET_ACCESS_KEY}`;
+  const endpoint = `https://${process.env.ACCOUNT_ID}.r2.cloudflarestorage.com`;
+
+  const {
+    definitionFile,
+    refSetFile1,
+    refSetFile2,
+    definitionFileBrotli,
+    refSetFile1Brotli,
+    refSetFile2Brotli,
+  } = getFileNames(dir, true);
+
+  s3 = new S3Client({
+    region: 'auto',
+    credentials: {
+      accessKeyId,
+      secretAccessKey,
+    },
+    endpoint,
+  });
+  await uploadToS3(definitionFile, definitionFileBrotli);
+  await uploadToS3(refSetFile1, refSetFile1Brotli);
+  await uploadToS3(refSetFile2, refSetFile2Brotli);
 }
 
 // Get latest TRUD version
@@ -337,4 +416,5 @@ getLatestUrl()
   .then(extractZip)
   .then(loadDataIntoMemory)
   .then(compressJson)
+  .then(uploadToR2)
   .then(rest);
