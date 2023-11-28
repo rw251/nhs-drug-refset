@@ -6,7 +6,10 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "brotli": "brotli-cli compress --glob \"files/processed/**/*.json\"",
-    "start": "http-server --port 8944 --open --brotli"
+    "copy": "cpy web/worker.template.js . --rename=worker.js",
+    "replace:dev": "replace-in-files --string='{URL}' --replacement='' web/worker.js",
+    "prestart": "npm run copy && npm run replace:dev",
+    "start": "http-server ./web --port 8944 --open --brotli"
   },
   "keywords": [],
   "author": "",
@@ -18,5 +21,9 @@
     "decompress": "^4.2.1",
     "dotenv": "^16.3.1",
     "http-server": "^14.1.1"
+  },
+  "dependencies": {
+    "cpy-cli": "^5.0.0",
+    "replace-in-files-cli": "^2.2.0"
   }
 }

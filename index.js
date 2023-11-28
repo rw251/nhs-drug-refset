@@ -339,7 +339,7 @@ function compressJson(dir) {
 function rest() {
   const versions = readdirSync(PROCESSED_DIR).filter((x) => x !== '.gitignore');
   writeFileSync(
-    path.join(__dirname, 'routes.json'),
+    path.join(__dirname, 'web', 'routes.json'),
     JSON.stringify(versions, null, 2)
   );
 }
