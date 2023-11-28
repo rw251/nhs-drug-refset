@@ -57,7 +57,7 @@ let refSets;
 let list;
 
 async function setupRoutes() {
-  const routes = await fetch('/routes.json').then((x) => x.json());
+  const routes = await fetch('/web/routes.json').then((x) => x.json());
   $versionPicker.innerHTML = `<option disabled selected>Please select SNOMED version</option>${routes.map(
     (x) => `<option>${x}</option>`
   )}`;
