@@ -85,8 +85,8 @@ onmessage = (e) => {
 
 async function loadDefinitions(folder) {
   console.log('loading defs...');
-  definitions = await fetch(`/files/processed/${folder}/defs.json`).then((x) =>
-    x.json()
+  definitions = await fetch(`{URL}/files/processed/${folder}/defs.json`).then(
+    (x) => x.json()
   );
   console.log(new Date().toISOString(), 'Defs loaded');
   postMessage({ msg: 'defsLoaded' });
@@ -94,9 +94,9 @@ async function loadDefinitions(folder) {
 
 async function loadRefSets(folder) {
   console.log('loading refs...');
-  refSets = await fetch(`/files/processed/${folder}/refSets-0-9999.json`).then(
-    (x) => x.json()
-  );
+  refSets = await fetch(
+    `{URL}/files/processed/${folder}/refSets-0-9999.json`
+  ).then((x) => x.json());
   refSetNames = Object.keys(refSets);
   const refSetHTML = refSetNames
     .map(

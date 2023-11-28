@@ -8,8 +8,10 @@
     "brotli": "brotli-cli compress --glob \"files/processed/**/*.json\"",
     "copy": "cpy web/worker.template.js . --rename=worker.js",
     "replace:dev": "replace-in-files --string='{URL}' --replacement='' web/worker.js",
+    "replace:prod": "replace-in-files --string='{URL}' --replacement='$URL' web/worker.js",
     "prestart": "npm run copy && npm run replace:dev",
-    "start": "http-server ./web --port 8944 --open --brotli"
+    "build": "npm run copy && npm run replace:prod",
+    "start": "http-server --port 8944 --open --brotli"
   },
   "keywords": [],
   "author": "",
