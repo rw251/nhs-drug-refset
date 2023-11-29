@@ -31,10 +31,16 @@
     <link rel="stylesheet" href="/web/style.css" />
   </head>
   <body>
-    <div id="version-wrapper" style="text-align: center; font-size: 18px">
+    <div class="banner">
+      <span class="title">NHS drug refsets</span>
       <select id="version">
         <option disabled selected>Please select SNOMED version</option>
       </select>
+    </div>
+    <div id="version-wrapper" style="text-align: center; font-size: 18px"></div>
+    <div class="tab">
+      <button class="tablinks" onclick="openTab('Refsets')">Refsets</button>
+      <button class="tablinks" onclick="openTab('Codes')">Codes</button>
     </div>
     <div class="wrapper" style="display: none">
       <div id="ref-set-wrapper" style="text-align: center">
@@ -63,7 +69,7 @@
             "
           >
             <span id="message"></span>
-            <button>Copy</button>
+            <button id="copy">Copy</button>
           </div>
         </div>
         <div class="scrollable scrollable-defs">

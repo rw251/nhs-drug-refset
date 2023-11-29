@@ -8,16 +8,27 @@ html, body {
 
 .wrapper {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  column-gap: 10px;
-  height: 100%;
+  grid-template-columns: 1fr;
+  column-gap: 0;
+  height: calc(100% - 102px);
 }
 
 select {
-  padding: 8px;
-  border: 1px solid #cccccc;
-  width: 50%;
-  margin: 10px auto;
+  padding: 4px;
+  border: 1px solid #555555;
+  width: 220px;
+  margin-left: 20px;
+  background-color: #DBA515;
+  text-align: center;
+}
+
+option {
+  text-align: center;
+  padding: 4px;
+}
+
+option:disabled {
+  display: none;
 }
 
 li {
@@ -37,7 +48,7 @@ li:hover {
 
 li.selected {
   background-color: yellow;
-  font-weight: bold;
+  /* font-weight: bold; */
 }
 
 ul {
@@ -104,6 +115,7 @@ table{
   width: 100%;
   overflow: hidden;
   margin-bottom: 10px;
+  table-layout: fixed;
 }
 thead > tr {
   background: #eeeeee;
@@ -167,4 +179,68 @@ button:disabled, button[disabled] {
 
 .list {
   border: 1px solid rgba(0,0,0,.125);
+}
+
+.banner {
+  padding: 5px;
+  text-align: center;
+  background: #14ba99;
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  height: 26px;
+
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+  justify-content: flex-start;
+}
+
+/* .snomed-version {
+  padding: 6px;
+  background-color: #DBA515;
+  border-radius: 3px;
+} */
+
+/*TABS*/
+
+@media (min-width: 640px) {
+  .tab {
+    display: none;
+  }
+  .wrapper {
+    grid-template-columns: 1fr 1fr;
+    column-gap: 10px;
+  }
+}
+
+/* Style the tab */
+.tab {
+  overflow: hidden;
+  border: 1px solid #ccc;
+  background-color: #f1f1f1;
+}
+
+/* Style the buttons inside the tab */
+.tab button {
+  background-color: inherit;
+  color: black;
+  margin: 0;
+  float: left;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  transition: 0.3s;
+  font-size: 17px;
+}
+
+/* Change background color of buttons on hover */
+.tab button:hover {
+  background-color: #ddd;
+}
+
+/* Create an active/current tablink class */
+.tab button.active {
+  background-color: #ccc;
 }
