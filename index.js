@@ -30,6 +30,7 @@ const FILES_DIR = path.join(__dirname, 'files');
 const ZIP_DIR = path.join(FILES_DIR, 'zip');
 const RAW_DIR = path.join(FILES_DIR, 'raw');
 const PROCESSED_DIR = path.join(FILES_DIR, 'processed');
+const CODE_LOOKUP = path.join(FILES_DIR, 'code-lookup.json');
 
 const existingFiles = fs.readdirSync(ZIP_DIR);
 
@@ -134,12 +135,17 @@ function getFileNames(dir, startingFromProjectDir) {
   const processedFilesDir = startingFromProjectDir
     ? path.join('files', 'processed', dir)
     : processedFilesDirFromRoot;
-  const definitionFile = path.join(processedFilesDir, 'defs.json');
+  const definitionFile1 = path.join(processedFilesDir, 'defs-0-9999.json');
+  const definitionFile2 = path.join(processedFilesDir, 'defs-10000+.json');
   const refSetFile1 = path.join(processedFilesDir, 'refSets-0-9999.json');
   const refSetFile2 = path.join(processedFilesDir, 'refSets-10000+.json');
-  const definitionFileBrotli = path.join(
+  const definitionFileBrotli1 = path.join(
     processedFilesDirFromRoot,
-    'defs.json.br'
+    'defs-0-9999.json.br'
+  );
+  const definitionFileBrotli2 = path.join(
+    processedFilesDirFromRoot,
+    'defs-10000+.json.br'
   );
   const refSetFile1Brotli = path.join(
     processedFilesDirFromRoot,
@@ -151,10 +157,12 @@ function getFileNames(dir, startingFromProjectDir) {
   );
   return {
     rawFilesDir,
-    definitionFile,
+    definitionFile1,
+    definitionFile2,
     refSetFile1,
     refSetFile2,
-    definitionFileBrotli,
+    definitionFileBrotli1,
+    definitionFileBrotli2,
     refSetFile1Brotli,
     refSetFile2Brotli,
     processedFilesDir,
@@ -162,16 +170,18 @@ function getFileNames(dir, startingFromProjectDir) {
   };
 }
 
-function loadDataIntoMemory(dir) {
+async function loadDataIntoMemory(dir) {
   const {
     processedFilesDirFromRoot,
     rawFilesDir,
-    definitionFile,
+    definitionFile1,
+    definitionFile2,
     refSetFile1,
     refSetFile2,
   } = getFileNames(dir);
   if (
-    existsSync(definitionFile) &&
+    existsSync(definitionFile1) &&
+    existsSync(definitionFile2) &&
     existsSync(refSetFile1) &&
     existsSync(refSetFile2)
   ) {
@@ -297,7 +307,94 @@ function loadDataIntoMemory(dir) {
     }
   });
 
-  writeFileSync(definitionFile, JSON.stringify(simpleDefs, null, 2));
+  // Find snomed codes without definition
+
+  // First get the lookup of unknown codes
+  const knownCodeLookup = existsSync(CODE_LOOKUP)
+    ? JSON.parse(readFileSync(CODE_LOOKUP, 'utf8'))
+    : {};
+
+  const unknownCodes = Object.values(simpleRefSetsLT10000)
+    .map((x) => x.activeConcepts.concat(x.inactiveConcepts))
+    .flat()
+    .filter((conceptId) => !simpleDefs[conceptId])
+    .map((conceptId) => {
+      if (knownCodeLookup[conceptId]) {
+        simpleDefs[conceptId] = knownCodeLookup[conceptId];
+        return false;
+      }
+      return conceptId;
+    })
+    .filter(Boolean);
+
+  if (unknownCodes.length > 0) {
+    console.log(
+      `> There are ${unknownCodes.length} codes without a definition.`
+    );
+    console.log(`> Attempting to look them up in the NHS SNOMED browser...`);
+  }
+
+  async function process40UnknownConcepts(items) {
+    console.log(`Looking up next 40 (out of ${items.length})`);
+    const next40 = items.splice(0, 40);
+    const fetches = next40.map((x) => {
+      return fetch(
+        `https://termbrowser.nhs.uk/sct-browser-api/snomed/uk-edition/v20230927/concepts/${x}`
+      ).then((x) => x.json());
+    });
+    const results = await Promise.all(fetches).catch((err) => {
+      console.log(
+        'Error retrieving data from NHS SNOMED browser. Rerunning will probably be fine.'
+      );
+      process.exit();
+    });
+    results.forEach(({ conceptId, fsn, effectiveTime, active }) => {
+      const def = {
+        active,
+        term: fsn,
+        effectiveTime,
+        isSynonym: false,
+      };
+      knownCodeLookup[conceptId] = def;
+      simpleDefs[conceptId] = def;
+    });
+    writeFileSync(CODE_LOOKUP, JSON.stringify(knownCodeLookup, null, 2));
+    const next = 2000 + Math.random() * 5000;
+    if (items.length > 0) {
+      console.log(`Waiting ${next} milliseconds before next batch...`);
+      return new Promise((resolve) => {
+        setTimeout(async () => {
+          await process40UnknownConcepts(items);
+          return resolve();
+        }, next);
+      });
+    }
+  }
+
+  if (unknownCodes.length > 0) {
+    await process40UnknownConcepts(unknownCodes);
+  }
+
+  const simpleDefsLT10000 = {};
+  const simpleDefs10000PLUS = {};
+
+  Object.values(simpleRefSetsLT10000)
+    .map((x) => x.activeConcepts.concat(x.inactiveConcepts))
+    .flat()
+    .forEach((conceptId) => {
+      simpleDefsLT10000[conceptId] = simpleDefs[conceptId];
+    });
+
+  Object.values(simpleRefSets10000PLUS)
+    .map((x) => x.activeConcepts.concat(x.inactiveConcepts))
+    .flat()
+    .forEach((conceptId) => {
+      if (simpleDefs[conceptId])
+        simpleDefs10000PLUS[conceptId] = simpleDefs[conceptId].term;
+    });
+
+  writeFileSync(definitionFile1, JSON.stringify(simpleDefsLT10000, null, 2));
+  writeFileSync(definitionFile2, JSON.stringify(simpleDefs10000PLUS, null, 2));
   writeFileSync(refSetFile1, JSON.stringify(simpleRefSetsLT10000, null, 2));
   writeFileSync(refSetFile2, JSON.stringify(simpleRefSets10000PLUS, null, 2));
 
@@ -316,15 +413,18 @@ function brot(file, fileBrotli) {
 
 function compressJson(dir) {
   const {
-    definitionFile,
+    definitionFile1,
+    definitionFile2,
     refSetFile1,
     refSetFile2,
-    definitionFileBrotli,
+    definitionFileBrotli1,
+    definitionFileBrotli2,
     refSetFile1Brotli,
     refSetFile2Brotli,
   } = getFileNames(dir);
   if (
-    existsSync(definitionFileBrotli) &&
+    existsSync(definitionFileBrotli1) &&
+    existsSync(definitionFileBrotli2) &&
     existsSync(refSetFile1Brotli) &&
     existsSync(refSetFile2Brotli)
   ) {
@@ -338,7 +438,8 @@ function compressJson(dir) {
 
   brot(refSetFile1, refSetFile1Brotli);
   brot(refSetFile2, refSetFile2Brotli);
-  brot(definitionFile, definitionFileBrotli);
+  brot(definitionFile1, definitionFileBrotli1);
+  brot(definitionFile2, definitionFileBrotli2);
   console.log(`> All compressed.`);
   return dir;
 }
@@ -396,10 +497,12 @@ async function uploadToR2(dir) {
   const endpoint = `https://${process.env.ACCOUNT_ID}.r2.cloudflarestorage.com`;
 
   const {
-    definitionFile,
+    definitionFile1,
+    definitionFile2,
     refSetFile1,
     refSetFile2,
-    definitionFileBrotli,
+    definitionFileBrotli1,
+    definitionFileBrotli2,
     refSetFile1Brotli,
     refSetFile2Brotli,
   } = getFileNames(dir, true);
@@ -412,7 +515,8 @@ async function uploadToR2(dir) {
     },
     endpoint,
   });
-  await uploadToS3(definitionFile, definitionFileBrotli);
+  await uploadToS3(definitionFile1, definitionFileBrotli1);
+  await uploadToS3(definitionFile2, definitionFileBrotli2);
   await uploadToS3(refSetFile1, refSetFile1Brotli);
   await uploadToS3(refSetFile2, refSetFile2Brotli);
 }

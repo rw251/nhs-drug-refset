@@ -85,9 +85,9 @@ onmessage = (e) => {
 
 async function loadDefinitions(folder) {
   console.log('loading defs...');
-  definitions = await fetch(`{URL}/files/processed/${folder}/defs.json`).then(
-    (x) => x.json()
-  );
+  definitions = await fetch(
+    `{URL}/files/processed/${folder}/defs-0-9999.json`
+  ).then((x) => x.json());
   console.log(new Date().toISOString(), 'Defs loaded');
   postMessage({ msg: 'defsLoaded' });
 }
