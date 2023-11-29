@@ -157,12 +157,19 @@ function getFileNames(dir, startingFromProjectDir) {
     definitionFileBrotli,
     refSetFile1Brotli,
     refSetFile2Brotli,
+    processedFilesDir,
+    processedFilesDirFromRoot,
   };
 }
 
 function loadDataIntoMemory(dir) {
-  const { rawFilesDir, definitionFile, refSetFile1, refSetFile2 } =
-    getFileNames(dir);
+  const {
+    processedFilesDirFromRoot,
+    rawFilesDir,
+    definitionFile,
+    refSetFile1,
+    refSetFile2,
+  } = getFileNames(dir);
   if (
     existsSync(definitionFile) &&
     existsSync(refSetFile1) &&
@@ -173,8 +180,8 @@ function loadDataIntoMemory(dir) {
     // const refSets = JSON.parse(readFileSync(definitionFile));
     return dir;
   }
-  if (!existsSync(processedFilesDir)) {
-    mkdirSync(processedFilesDir);
+  if (!existsSync(processedFilesDirFromRoot)) {
+    mkdirSync(processedFilesDirFromRoot);
   }
   const DRUG_DIR = path.join(
     rawFilesDir,
