@@ -204,6 +204,15 @@ button:disabled, button[disabled] {
 
 /*TABS*/
 
+.tab-content {
+  transform: translateX(-4000px);
+  position: absolute;
+}
+
+.tab-content.focus {
+  transform: translateX(0px);
+}
+
 @media (min-width: 640px) {
   .tab {
     display: none;
@@ -211,6 +220,10 @@ button:disabled, button[disabled] {
   .wrapper {
     grid-template-columns: 1fr 1fr;
     column-gap: 10px;
+  }
+  .tab-content {
+    transform: translateX(0px);
+    position: inherit;
   }
 }
 

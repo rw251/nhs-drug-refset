@@ -160,19 +160,18 @@ $copy.addEventListener('click', async (e) => {
 function openTab(tabName) {
   if (window.getComputedStyle($tab).display === 'none') return;
 
-  $refSetWrapper.style.display = 'none';
-  $refSetCodesPanel.style.display = 'none';
-
   const tablinks = document.getElementsByClassName('tablinks');
 
   if (tabName === 'Codes') {
     tablinks[0].classList.remove('active');
     tablinks[1].classList.add('active');
-    $refSetCodesPanel.style.display = 'block';
+    $refSetCodesPanel.classList.add('focus');
+    $refSetWrapper.style.display = 'none';
   }
   if (tabName === 'Refsets') {
     tablinks[0].classList.add('active');
     tablinks[1].classList.remove('active');
+    $refSetCodesPanel.classList.remove('focus');
     $refSetWrapper.style.display = 'block';
   }
 }
