@@ -69,11 +69,17 @@
             "
           >
             <span id="message"></span>
-            <button id="copy">Copy</button>
+            <div id="buttons">
+              <button id="show-inactive" style="width: 120px">
+                Show inactive
+              </button>
+              <button id="copy" style="width: 120px">Copy active only</button>
+              <button id="copy-all" style="width: 120px">Copy all</button>
+            </div>
           </div>
         </div>
         <div class="scrollable scrollable-defs">
-          <table>
+          <table id="defs-table" class="hide-inactive">
             <thead>
               <tr>
                 <td>Code</td>

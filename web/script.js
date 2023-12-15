@@ -10,13 +10,17 @@ const $title = document.querySelector('#ref-set-codes h3');
 const $header = document.querySelector('.header');
 const $message = document.getElementById('message');
 const $copy = document.getElementById('copy');
+const $copyAll = document.getElementById('copy-all');
+const $toggleInactive = document.getElementById('show-inactive');
+const $definitionsTable = document.getElementById('defs-table');
 const $tab = document.querySelector('.tab');
 
-const worker = new Worker('/web/worker.js');
+const worker = new Worker('/web/worker.js?v=1.0.4');
 const loader =
   '<div class="lds-facebook"><div></div><div></div><div></div></div>';
 
-let data;
+let dataActive;
+let dataInactive;
 let refSetTimer;
 
 worker.onmessage = (e) => {
@@ -40,17 +44,34 @@ worker.onmessage = (e) => {
       $inp.focus();
       break;
     case 'data': {
-      data = content.data;
+      dataActive = content.dataActive;
+      dataInactive = content.dataInactive;
       $copy.removeAttribute('disabled', '');
+      $copyAll.removeAttribute('disabled', '');
+      $toggleInactive.removeAttribute('disabled', '');
       break;
     }
     case 'refset':
       if (content.numberOfConcepts === content.numberOfConceptsReturned) {
-        $message.innerText = `${content.numberOfConcepts} codes`;
+        $message.innerText = `${content.numberOfActiveConcepts} codes${
+          content.numberOfInactiveConcepts > 0
+            ? ` (and ${content.numberOfInactiveConcepts} inactive codes)`
+            : ''
+        }`;
       } else {
-        $message.innerText = `${content.numberOfConceptsReturned} (out of ${content.numberOfConcepts}) codes displayed.`;
+        $message.innerText = `${content.numberOfConceptsReturned} (out of ${
+          content.numberOfActiveConcepts
+        }${
+          content.numberOfInactiveConcepts > 0
+            ? ` active and ${content.numberOfInactiveConcepts} inactive`
+            : ''
+        }) codes displayed.`;
       }
       $refSetCodes.innerHTML = content.refSetHTML;
+      $copy.style.display =
+        content.numberOfInactiveConcepts > 0 ? 'inline-block' : 'none';
+      $toggleInactive.style.display =
+        content.numberOfInactiveConcepts > 0 ? 'inline-block' : 'none';
       $title.innerText = content.refSetId;
       break;
   }
@@ -103,7 +124,7 @@ function filter_list() {
   let re = new RegExp($inp.value, 'i');
   $list.forEach((x) => {
     if (re.test(x.textContent)) {
-      x.innerHTML = x.textContent.replace(re, '<b>$&</b>');
+      x.innerHTML = x.innerHTML.replace(/<\/?b>/g, '').replace(re, '<b>$&</b>');
       x.style.display = 'block';
     } else {
       x.style.display = 'none';
@@ -136,8 +157,18 @@ $listGroup.addEventListener('click', (e) => {
   }px`;
 
   $copy.setAttribute('disabled', '');
+  $copyAll.setAttribute('disabled', '');
+  $toggleInactive.setAttribute('disabled', '');
 
   worker.postMessage({ action: 'defs', params: { refSetId } });
+});
+
+$toggleInactive.addEventListener('click', () => {
+  $definitionsTable.classList.toggle('hide-inactive');
+  $toggleInactive.innerText =
+    $toggleInactive.innerText === 'Show inactive'
+      ? 'Hide inactive'
+      : 'Show inactive';
 });
 
 $copy.addEventListener('click', async (e) => {
@@ -145,14 +176,31 @@ $copy.addEventListener('click', async (e) => {
   $copy.setAttribute('disabled', '');
   $copy.innerText = 'Copying...';
   // Copy the text inside the text field
-  await navigator.clipboard.writeText(data);
+  await navigator.clipboard.writeText(dataActive); //TODO need to either copy active or both
 
   const diff = new Date() - now;
   setTimeout(() => {
     $copy.removeAttribute('disabled', '');
     $copy.innerText = 'Copied!';
     setTimeout(() => {
-      $copy.innerText = 'Copy';
+      $copy.innerText = 'Copy active only';
+    }, 2000);
+  }, Math.max(0, 500 - diff));
+});
+
+$copyAll.addEventListener('click', async (e) => {
+  const now = new Date();
+  $copyAll.setAttribute('disabled', '');
+  $copyAll.innerText = 'Copying...';
+  // Copy the text inside the text field
+  await navigator.clipboard.writeText(`${dataActive}\n${dataInactive}`); //TODO need to either copy active or both
+
+  const diff = new Date() - now;
+  setTimeout(() => {
+    $copyAll.removeAttribute('disabled', '');
+    $copyAll.innerText = 'Copied!';
+    setTimeout(() => {
+      $copyAll.innerText = 'Copy all';
     }, 2000);
   }, Math.max(0, 500 - diff));
 });

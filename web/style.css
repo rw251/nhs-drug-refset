@@ -51,6 +51,10 @@ li.selected {
   /* font-weight: bold; */
 }
 
+li span {
+  font-size: 0.8rem;
+}
+
 ul {
   display: flex;
   flex-direction: column;
@@ -129,6 +133,14 @@ td, th {
   position: relative;
 }
 
+tr.inactive {
+  background-color: #ff9898;
+}
+
+.hide-inactive tr.inactive {
+  display: none;
+}
+
 .scrollable {
   overflow-y: auto;
   /* Firefox understands this*/
@@ -165,7 +177,7 @@ button {
   background-color: #4caf50;
   border: none;
   color: white;
-  padding: 16px 32px;
+  padding: 6px 12px;
   text-align: center;
   text-decoration: none;
   display: inline-block;
