@@ -48,7 +48,6 @@ li:hover {
 
 li.selected {
   background-color: yellow;
-  /* font-weight: bold; */
 }
 
 li span {
