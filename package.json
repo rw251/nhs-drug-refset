@@ -11,7 +11,8 @@
     "replace:prod": "replace-in-files --string='{URL}' --replacement=$URL web/worker.js",
     "prestart": "npm run copy && npm run replace:dev",
     "build": "npm run copy && npm run replace:prod",
-    "start": "http-server --port 8944 --open --brotli"
+    "start": "http-server --port 8944 --open --brotli",
+    "process": "node --max-old-space-size=8192 index.js"
   },
   "keywords": [],
   "author": "",
