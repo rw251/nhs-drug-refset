@@ -7,39 +7,33 @@
  *
  */
 
-import fs, {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  writeFileSync,
-} from 'fs';
-import { Readable } from 'stream';
-import { finished } from 'stream/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import 'dotenv/config';
-import decompress from 'decompress';
-import { compress } from 'brotli';
+import fs, { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
+import { Readable } from "stream";
+import { finished } from "stream/promises";
+import path from "path";
+import { fileURLToPath } from "url";
+import "dotenv/config";
+import decompress from "decompress";
+import { compress } from "brotli";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let Cookie;
 
-const FILES_DIR = path.join(__dirname, 'files');
-const ZIP_DIR = path.join(FILES_DIR, 'zip');
-const RAW_DIR = path.join(FILES_DIR, 'raw');
-const PROCESSED_DIR = path.join(FILES_DIR, 'processed');
-const CODE_LOOKUP = path.join(FILES_DIR, 'code-lookup.json');
+const FILES_DIR = path.join(__dirname, "files");
+const ZIP_DIR = path.join(FILES_DIR, "zip");
+const RAW_DIR = path.join(FILES_DIR, "raw");
+const PROCESSED_DIR = path.join(FILES_DIR, "processed");
+const CODE_LOOKUP = path.join(FILES_DIR, "code-lookup.json");
 
 const existingFiles = fs.readdirSync(ZIP_DIR);
 
 if (!process.env.email) {
-  console.log('Need email=xxx in the .env file');
+  console.log("Need email=xxx in the .env file");
   process.exit();
 }
 if (!process.env.password) {
-  console.log('Need password=xxx in the .env file');
+  console.log("Need password=xxx in the .env file");
   process.exit();
 }
 
@@ -48,38 +42,33 @@ async function login() {
   const email = process.env.email;
   const password = process.env.password;
 
-  console.log('> Logging in to TRUD...');
-  const result = await fetch(
-    'https://isd.digital.nhs.uk/trud/security/j_spring_security_check',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      redirect: 'manual',
-      body: new URLSearchParams({
-        j_username: email,
-        j_password: password,
-        commit: 'LOG+IN',
-      }),
-    }
-  );
+  console.log("> Logging in to TRUD...");
+  const result = await fetch("https://isd.digital.nhs.uk/trud/security/j_spring_security_check", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    redirect: "manual",
+    body: new URLSearchParams({
+      j_username: email,
+      j_password: password,
+      commit: "LOG+IN",
+    }),
+  });
   const cookies = result.headers.getSetCookie();
-  const cookie = cookies.filter((x) => x.indexOf('JSESSIONID') > -1)[0];
-  console.log('> Logged in, and cookie cached.');
+  const cookie = cookies.filter((x) => x.indexOf("JSESSIONID") > -1)[0];
+  console.log("> Logged in, and cookie cached.");
   Cookie = cookie;
 }
 
 async function getLatestUrl() {
   await login();
   const response = await fetch(
-    'https://isd.digital.nhs.uk/trud/users/authenticated/filters/0/categories/26/items/105/releases?source=summary',
+    "https://isd.digital.nhs.uk/trud/users/authenticated/filters/0/categories/26/items/105/releases?source=summary",
     { headers: { Cookie } }
   );
   const html = await response.text();
-  const downloads = html.match(
-    /href="(https:\/\/isd.digital.nhs.uk\/download[^"]+)"/
-  );
+  const downloads = html.match(/href="(https:\/\/isd.digital.nhs.uk\/download[^"]+)"/);
   const latest = downloads[1];
   return latest;
 }
@@ -87,7 +76,7 @@ async function getLatestUrl() {
 async function downloadIfNotExists(url) {
   await login();
 
-  const filename = url.split('/').reverse()[0].split('?')[0];
+  const filename = url.split("/").reverse()[0].split("?")[0];
   console.log(`> The most recent zip file on TRUD is ${filename}`);
 
   if (existingFiles.indexOf(filename) > -1) {
@@ -105,13 +94,11 @@ async function downloadIfNotExists(url) {
 }
 
 async function extractZip(zipFile) {
-  const name = zipFile.replace('.zip', '');
+  const name = zipFile.replace(".zip", "");
   const file = path.join(ZIP_DIR, zipFile);
   const outDir = path.join(RAW_DIR, name);
   if (existsSync(outDir)) {
-    console.log(
-      `> The directory ${outDir} already exists, so I'm not unzipping.`
-    );
+    console.log(`> The directory ${outDir} already exists, so I'm not unzipping.`);
     return name;
   }
   console.log(`> The directory ${outDir} does not yet exist. Creating...`);
@@ -119,9 +106,9 @@ async function extractZip(zipFile) {
   console.log(`> Extracting files from the zip...`);
   const files = await decompress(file, outDir, {
     filter: (file) => {
-      if (file.path.toLowerCase().indexOf('full') > -1) return true;
-      if (file.path.toLowerCase().indexOf('readme') > -1) return true;
-      if (file.path.toLowerCase().indexOf('information') > -1) return true;
+      if (file.path.toLowerCase().indexOf("full") > -1) return true;
+      if (file.path.toLowerCase().indexOf("readme") > -1) return true;
+      if (file.path.toLowerCase().indexOf("information") > -1) return true;
       return false;
     },
   });
@@ -133,28 +120,16 @@ function getFileNames(dir, startingFromProjectDir) {
   const rawFilesDir = path.join(RAW_DIR, dir);
   const processedFilesDirFromRoot = path.join(PROCESSED_DIR, dir);
   const processedFilesDir = startingFromProjectDir
-    ? path.join('files', 'processed', dir)
+    ? path.join("files", "processed", dir)
     : processedFilesDirFromRoot;
-  const definitionFile1 = path.join(processedFilesDir, 'defs-0-9999.json');
-  const definitionFile2 = path.join(processedFilesDir, 'defs-10000+.json');
-  const refSetFile1 = path.join(processedFilesDir, 'refSets-0-9999.json');
-  const refSetFile2 = path.join(processedFilesDir, 'refSets-10000+.json');
-  const definitionFileBrotli1 = path.join(
-    processedFilesDirFromRoot,
-    'defs-0-9999.json.br'
-  );
-  const definitionFileBrotli2 = path.join(
-    processedFilesDirFromRoot,
-    'defs-10000+.json.br'
-  );
-  const refSetFile1Brotli = path.join(
-    processedFilesDirFromRoot,
-    'refSets-0-9999.json.br'
-  );
-  const refSetFile2Brotli = path.join(
-    processedFilesDirFromRoot,
-    'refSets-10000+.json.br'
-  );
+  const definitionFile1 = path.join(processedFilesDir, "defs-0-9999.json");
+  const definitionFile2 = path.join(processedFilesDir, "defs-10000+.json");
+  const refSetFile1 = path.join(processedFilesDir, "refSets-0-9999.json");
+  const refSetFile2 = path.join(processedFilesDir, "refSets-10000+.json");
+  const definitionFileBrotli1 = path.join(processedFilesDirFromRoot, "defs-0-9999.json.br");
+  const definitionFileBrotli2 = path.join(processedFilesDirFromRoot, "defs-10000+.json.br");
+  const refSetFile1Brotli = path.join(processedFilesDirFromRoot, "refSets-0-9999.json.br");
+  const refSetFile2Brotli = path.join(processedFilesDirFromRoot, "refSets-10000+.json.br");
   return {
     rawFilesDir,
     definitionFile1,
@@ -195,50 +170,43 @@ async function loadDataIntoMemory(dir) {
   }
   const DRUG_DIR = path.join(
     rawFilesDir,
-    readdirSync(rawFilesDir).filter((x) => x.indexOf('Drug') > -1)[0]
+    readdirSync(rawFilesDir).filter((x) => x.indexOf("Drug") > -1)[0]
   );
-  const REFSET_DIR = path.join(DRUG_DIR, 'Full', 'Refset', 'Content');
+  const REFSET_DIR = path.join(DRUG_DIR, "Full", "Refset", "Content");
   const refsetFile = path.join(
     REFSET_DIR,
-    readdirSync(REFSET_DIR).filter((x) => x.indexOf('Simple') > -1)[0]
+    readdirSync(REFSET_DIR).filter((x) => x.indexOf("Simple") > -1)[0]
   );
   const refSets = {};
   const allConcepts = {};
-  readFileSync(refsetFile, 'utf8')
-    .split('\n')
+  readFileSync(refsetFile, "utf8")
+    .split("\n")
     .forEach((row) => {
-      const [
-        id,
-        effectiveTime,
-        active,
-        moduleId,
-        refsetId,
-        referencedComponentId,
-      ] = row.replace(/\r/g, '').split('\t');
+      const [id, effectiveTime, active, moduleId, refsetId, referencedComponentId] = row
+        .replace(/\r/g, "")
+        .split("\t");
       if (!refSets[refsetId]) {
         allConcepts[refsetId] = true;
         refSets[refsetId] = { activeConcepts: [], inactiveConcepts: [] };
       }
       allConcepts[referencedComponentId] = true;
-      if (active === '1') {
+      if (active === "1") {
         refSets[refsetId].activeConcepts.push(referencedComponentId);
       } else {
         refSets[refsetId].inactiveConcepts.push(referencedComponentId);
       }
     });
-  console.log(
-    `> Ref set file loaded. It has ${Object.keys(refSets).length} rows.`
-  );
+  console.log(`> Ref set file loaded. It has ${Object.keys(refSets).length} rows.`);
 
   const definitions = {};
 
-  const TERM_DIR = path.join(DRUG_DIR, 'Full', 'Terminology');
+  const TERM_DIR = path.join(DRUG_DIR, "Full", "Terminology");
   const descFile = path.join(
     TERM_DIR,
-    readdirSync(TERM_DIR).filter((x) => x.indexOf('_Description_') > -1)[0]
+    readdirSync(TERM_DIR).filter((x) => x.indexOf("_Description_") > -1)[0]
   );
-  readFileSync(descFile, 'utf8')
-    .split('\n')
+  readFileSync(descFile, "utf8")
+    .split("\n")
     .forEach((row) => {
       const [
         id,
@@ -250,28 +218,26 @@ async function loadDataIntoMemory(dir) {
         typeId,
         term,
         caseSignificanceId,
-      ] = row.replace(/\r/g, '').split('\t');
+      ] = row.replace(/\r/g, "").split("\t");
       if (!definitions[conceptId]) definitions[conceptId] = [];
-      if (active === '1') {
+      if (active === "1") {
         definitions[conceptId].push({
-          active: active === '1',
+          active: active === "1",
           term,
           effectiveTime,
-          isSynonym: typeId === '900000000000013009',
+          isSynonym: typeId === "900000000000013009",
         });
       } else {
         definitions[conceptId].push({
-          active: active === '1',
+          active: active === "1",
           term,
           effectiveTime,
-          isSynonym: typeId === '900000000000013009',
+          isSynonym: typeId === "900000000000013009",
         });
       }
     });
   //
-  console.log(
-    `> Description file loaded. It has ${Object.keys(definitions).length} rows.`
-  );
+  console.log(`> Description file loaded. It has ${Object.keys(definitions).length} rows.`);
   const simpleDefs = {};
   Object.entries(definitions).forEach(([conceptId, defs]) => {
     if (!allConcepts[conceptId]) return;
@@ -289,18 +255,14 @@ async function loadDataIntoMemory(dir) {
   const simpleRefSets10000PLUS = {};
 
   Object.keys(refSets).forEach((refSetId) => {
-    if (!simpleDefs[refSetId])
-      console.log(`No description for refset with id: ${refSetId}`);
+    if (!simpleDefs[refSetId]) console.log(`No description for refset with id: ${refSetId}`);
     else {
       let simpleRefSets =
-        refSets[refSetId].activeConcepts.length +
-          refSets[refSetId].inactiveConcepts.length <
-        10000
+        refSets[refSetId].activeConcepts.length + refSets[refSetId].inactiveConcepts.length < 10000
           ? simpleRefSetsLT10000
           : simpleRefSets10000PLUS;
       const def = simpleDefs[refSetId].term;
-      if (simpleRefSets[def])
-        console.log(`There is already an entry for: ${def}`);
+      if (simpleRefSets[def]) console.log(`There is already an entry for: ${def}`);
       else {
         simpleRefSets[def] = refSets[refSetId];
       }
@@ -311,7 +273,7 @@ async function loadDataIntoMemory(dir) {
 
   // First get the lookup of unknown codes
   const knownCodeLookup = existsSync(CODE_LOOKUP)
-    ? JSON.parse(readFileSync(CODE_LOOKUP, 'utf8'))
+    ? JSON.parse(readFileSync(CODE_LOOKUP, "utf8"))
     : {};
 
   const unknownCodes = Object.values(simpleRefSetsLT10000)
@@ -328,9 +290,7 @@ async function loadDataIntoMemory(dir) {
     .filter(Boolean);
 
   if (unknownCodes.length > 0) {
-    console.log(
-      `> There are ${unknownCodes.length} codes without a definition.`
-    );
+    console.log(`> There are ${unknownCodes.length} codes without a definition.`);
     console.log(`> Attempting to look them up in the NHS SNOMED browser...`);
   }
 
@@ -344,7 +304,7 @@ async function loadDataIntoMemory(dir) {
     });
     const results = await Promise.all(fetches).catch((err) => {
       console.log(
-        'Error retrieving data from NHS SNOMED browser. Rerunning will probably be fine.'
+        "Error retrieving data from NHS SNOMED browser. Rerunning will probably be fine."
       );
       process.exit();
     });
@@ -389,8 +349,7 @@ async function loadDataIntoMemory(dir) {
     .map((x) => x.activeConcepts.concat(x.inactiveConcepts))
     .flat()
     .forEach((conceptId) => {
-      if (simpleDefs[conceptId])
-        simpleDefs10000PLUS[conceptId] = simpleDefs[conceptId].term;
+      if (simpleDefs[conceptId]) simpleDefs10000PLUS[conceptId] = simpleDefs[conceptId].term;
     });
 
   writeFileSync(definitionFile1, JSON.stringify(simpleDefsLT10000, null, 2));
@@ -404,7 +363,7 @@ async function loadDataIntoMemory(dir) {
 function brot(file, fileBrotli) {
   console.log(`> Compressing ${file}...`);
   const result = compress(readFileSync(file), {
-    extension: 'br',
+    extension: "br",
     quality: 11, //compression level - 11 is max
   });
   console.log(`> Compressed. Writing to ${fileBrotli}...`);
@@ -434,7 +393,7 @@ function compressJson(dir) {
     return dir;
   }
 
-  console.log('> Starting compression. TAKES A WHILE - GO GET A CUP OF TEA!');
+  console.log("> Starting compression. TAKES A WHILE - GO GET A CUP OF TEA!");
 
   brot(refSetFile1, refSetFile1Brotli);
   brot(refSetFile2, refSetFile2Brotli);
@@ -445,24 +404,21 @@ function compressJson(dir) {
 }
 
 function rest() {
-  const versions = readdirSync(PROCESSED_DIR).filter((x) => x !== '.gitignore');
-  writeFileSync(
-    path.join(__dirname, 'web', 'routes.json'),
-    JSON.stringify(versions, null, 2)
-  );
+  const additionalRoutes = readFileSync(path.join(__dirname, "_additional_routes.txt"), "utf8")
+    .split("\n")
+    .map((x) => x.trim());
+  const processedVersions = readdirSync(PROCESSED_DIR).filter((x) => x !== ".gitignore");
+  const versions = additionalRoutes.concat(processedVersions);
+  writeFileSync(path.join(__dirname, "web", "routes.json"), JSON.stringify(versions, null, 2));
 }
 
-import {
-  S3Client,
-  HeadObjectCommand,
-  PutObjectCommand,
-} from '@aws-sdk/client-s3';
+import { S3Client, HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 
 let s3;
 async function uploadToS3(file, brotliFile) {
   const posixFilePath = file.split(path.sep).join(path.posix.sep);
   const params = {
-    Bucket: 'nhs-drug-refset',
+    Bucket: "nhs-drug-refset",
     Key: posixFilePath,
   };
 
@@ -473,21 +429,21 @@ async function uploadToS3(file, brotliFile) {
       return true;
     })
     .catch((err) => {
-      if (err.name === 'NotFound') return false;
+      if (err.name === "NotFound") return false;
     });
 
   if (!exists) {
     console.log(`> ${file} does not exist in R2. Uploading...`);
     await s3.send(
       new PutObjectCommand({
-        Bucket: 'nhs-drug-refset',
+        Bucket: "nhs-drug-refset",
         Key: posixFilePath,
         Body: readFileSync(brotliFile),
-        ContentEncoding: 'br',
-        ContentType: 'application/json',
+        ContentEncoding: "br",
+        ContentType: "application/json",
       })
     );
-    console.log('> Uploaded.');
+    console.log("> Uploaded.");
   }
 }
 
@@ -508,7 +464,7 @@ async function uploadToR2(dir) {
   } = getFileNames(dir, true);
 
   s3 = new S3Client({
-    region: 'auto',
+    region: "auto",
     credentials: {
       accessKeyId,
       secretAccessKey,
