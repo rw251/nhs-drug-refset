@@ -43,20 +43,35 @@ async function login() {
   const password = process.env.password;
 
   console.log("> Logging in to TRUD...");
+
+  // Get initial session id by going to the login page
+
+  const loginPage = await fetch("https://isd.digital.nhs.uk/trud/users/guest/filters/0/login/form");
+  const sessionIdCookie = loginPage.headers
+    .getSetCookie()
+    .filter((x) => x.indexOf("JSESSIONID") > -1)[0]
+    .match(/JSESSIONID=([^ ;]+);/)[0];
+
+  const csrfToken = (await loginPage.text()).match(/_csrf" *value="([^"]+)"/)[1];
+
   const result = await fetch("https://isd.digital.nhs.uk/trud/security/j_spring_security_check", {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
+      Cookie: sessionIdCookie,
     },
     redirect: "manual",
     body: new URLSearchParams({
-      j_username: email,
-      j_password: password,
-      commit: "LOG+IN",
+      _csrf: csrfToken,
+      username: email,
+      password: password,
+      commit: "",
     }),
   });
   const cookies = result.headers.getSetCookie();
-  const cookie = cookies.filter((x) => x.indexOf("JSESSIONID") > -1)[0];
+  const cookie = cookies
+    .filter((x) => x.indexOf("JSESSIONID") > -1)[0]
+    .match(/JSESSIONID=([^ ;]+);/)[0];
   console.log("> Logged in, and cookie cached.");
   Cookie = cookie;
 }
@@ -65,7 +80,9 @@ async function getLatestUrl() {
   await login();
   const response = await fetch(
     "https://isd.digital.nhs.uk/trud/users/authenticated/filters/0/categories/26/items/105/releases?source=summary",
-    { headers: { Cookie } }
+    {
+      headers: { Cookie },
+    }
   );
   const html = await response.text();
   const downloads = html.match(/href="(https:\/\/isd.digital.nhs.uk\/download[^"]+)"/);
