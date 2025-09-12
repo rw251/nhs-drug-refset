@@ -18,8 +18,6 @@ import { compress } from "brotli";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-let Cookie;
-
 const FILES_DIR = path.join(__dirname, "files");
 const ZIP_DIR = path.join(FILES_DIR, "zip");
 const RAW_DIR = path.join(FILES_DIR, "raw");
@@ -28,71 +26,43 @@ const CODE_LOOKUP = path.join(FILES_DIR, "code-lookup.json");
 
 const existingFiles = fs.readdirSync(ZIP_DIR);
 
-if (!process.env.email) {
-  console.log("Need email=xxx in the .env file");
+function ensureDir(filePath, isDir) {
+  mkdirSync(isDir ? filePath : path.dirname(filePath), { recursive: true });
+  return filePath;
+}
+
+// Require API token for TRUD API access
+if (!process.env.TRUD_API_KEY) {
+  console.log("Need TRUD_API_KEY=xxx in the .env file");
   process.exit();
 }
-if (!process.env.password) {
-  console.log("Need password=xxx in the .env file");
-  process.exit();
-}
 
-async function login() {
-  if (Cookie) return;
-  const email = process.env.email;
-  const password = process.env.password;
-
-  console.log("> Logging in to TRUD...");
-
-  // Get initial session id by going to the login page
-
-  const loginPage = await fetch("https://isd.digital.nhs.uk/trud/users/guest/filters/0/login/form");
-  const sessionIdCookie = loginPage.headers
-    .getSetCookie()
-    .filter((x) => x.indexOf("JSESSIONID") > -1)[0]
-    .match(/JSESSIONID=([^ ;]+);/)[0];
-
-  const csrfToken = (await loginPage.text()).match(/_csrf" *value="([^"]+)"/)[1];
-
-  const result = await fetch("https://isd.digital.nhs.uk/trud/security/j_spring_security_check", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Cookie: sessionIdCookie,
-    },
-    redirect: "manual",
-    body: new URLSearchParams({
-      _csrf: csrfToken,
-      username: email,
-      password: password,
-      commit: "",
-    }),
-  });
-  const cookies = result.headers.getSetCookie();
-  const cookie = cookies
-    .filter((x) => x.indexOf("JSESSIONID") > -1)[0]
-    .match(/JSESSIONID=([^ ;]+);/)[0];
-  console.log("> Logged in, and cookie cached.");
-  Cookie = cookie;
-}
+// We use the TRUD API via TRUD_API_KEY.
 
 async function getLatestUrl() {
-  await login();
-  const response = await fetch(
-    "https://isd.digital.nhs.uk/trud/users/authenticated/filters/0/categories/26/items/105/releases?source=summary",
-    {
-      headers: { Cookie },
-    }
-  );
-  const html = await response.text();
-  const downloads = html.match(/href="(https:\/\/isd.digital.nhs.uk\/download[^"]+)"/);
-  const latest = downloads[1];
+  const apiToken = process.env.TRUD_API_KEY;
+  console.log("> Fetching releases from TRUD API...");
+  const url = `https://isd.digital.nhs.uk/trud/api/v1/keys/${apiToken}/items/105/releases`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    console.log(`> Failed to fetch releases: ${res.status} ${res.statusText}`);
+    process.exit(1);
+  }
+  const data = await res.json();
+  if (!data.releases || data.releases.length === 0) {
+    console.log("> No releases returned from TRUD API");
+    process.exit(1);
+  }
+  // Choose latest by releaseDate
+  const latestRelease = data.releases
+    .slice()
+    .sort((a, b) => new Date(b.releaseDate) - new Date(a.releaseDate))[0];
+  const latest = latestRelease.archiveFileUrl;
+  console.log(`> Latest archive URL from API: ${latest}`);
   return latest;
 }
 
 async function downloadIfNotExists(url) {
-  await login();
-
   const filename = url.split("/").reverse()[0].split("?")[0];
   console.log(`> The most recent zip file on TRUD is ${filename}`);
 
@@ -103,8 +73,8 @@ async function downloadIfNotExists(url) {
 
   console.log(`> That zip is not stored locally. Downloading...`);
   const outputFile = path.join(ZIP_DIR, filename);
-  const stream = fs.createWriteStream(outputFile);
-  const { body } = await fetch(url, { headers: { Cookie } });
+  const stream = createWriteStream(ensureDir(outputFile));
+  const { body } = await fetch(url);
   await finished(Readable.fromWeb(body).pipe(stream));
   console.log(`> File downloaded.`);
   return filename;
@@ -119,7 +89,7 @@ async function extractZip(zipFile) {
     return name;
   }
   console.log(`> The directory ${outDir} does not yet exist. Creating...`);
-  mkdirSync(outDir);
+  ensureDir(outDir, true);
   console.log(`> Extracting files from the zip...`);
   const files = await decompress(file, outDir, {
     filter: (file) => {
