@@ -27,3 +27,7 @@ Opens a web page. Should be self-explanatory.
 # Deploy
 
 Every push to `main` branch results in a cloudflare deployment at https://nhs-drug-refset.pages.dev/.
+
+# TODO
+
+I think I'm importing all codes in a refset and looking at the active flag, rather than just looking at the most recent refset map for each "id" and then taking it if it's active. Leads to e.g. refsets 999000061000001102 having 320490009 in the active AND inactive codes, when it should just be inactive.

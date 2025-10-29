@@ -7,7 +7,14 @@
  *
  */
 
-import fs, { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from "fs";
 import { Readable } from "stream";
 import { finished } from "stream/promises";
 import path from "path";
@@ -24,7 +31,7 @@ const RAW_DIR = path.join(FILES_DIR, "raw");
 const PROCESSED_DIR = path.join(FILES_DIR, "processed");
 const CODE_LOOKUP = path.join(FILES_DIR, "code-lookup.json");
 
-const existingFiles = fs.readdirSync(ZIP_DIR);
+const existingFiles = readdirSync(ZIP_DIR);
 
 function ensureDir(filePath, isDir) {
   mkdirSync(isDir ? filePath : path.dirname(filePath), { recursive: true });
@@ -354,7 +361,7 @@ function brot(file, fileBrotli) {
     quality: 11, //compression level - 11 is max
   });
   console.log(`> Compressed. Writing to ${fileBrotli}...`);
-  fs.writeFileSync(fileBrotli, result);
+  writeFileSync(fileBrotli, result);
 }
 
 function compressJson(dir) {
